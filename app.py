@@ -21,17 +21,19 @@ def bot_scroll_and_keep_alive():
         try:
             print("🚀 Playwright browser start hocche...")
             with sync_playwright() as p:
+                # System Chromium executable path use kora hocche
                 browser = p.chromium.launch(
+                    executable_path="/usr/bin/chromium",
                     headless=True,
                     args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
                 )
                 page = browser.new_page(viewport={"width": 1280, "height": 800})
                 
                 print(f"🌐 Navigating to {STREAMLIT_URL}...")
-                page.goto(STREAMLIT_URL, timeout=90000) # Increased timeout to 90s
+                page.goto(STREAMLIT_URL, timeout=90000)
                 
                 print("⏳ Waiting 45 seconds for Streamlit dynamic JS to load...")
-                time.sleep(45) # Increased wait time
+                time.sleep(45)
                 
                 print("📜 Scrolling down (Human behavior)...")
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
@@ -210,7 +212,6 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
-            // Auto refresh screenshot and status every 10 seconds without reloading page
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
@@ -231,7 +232,7 @@ def home():
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 10000); // 10 seconds interval
+            setInterval(autoRefreshData, 10000);
         </script>
     </body>
     </html>
