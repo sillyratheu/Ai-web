@@ -3,77 +3,37 @@ import os
 import time
 import threading
 from datetime import datetime
-from flask import Flask, send_file, render_template_string, jsonify
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from PIL import Image, ImageDraw
+from flask import Flask, render_template_string, jsonify
+import requests
 
 app = Flask(__name__)
 
 STREAMLIT_URL = "https://shahajjo.streamlit.app/"
-SCREENSHOT_PATH = "latest_status.png"
 
-last_ping_time = "Ekhono kono session complete hoyni"
+last_ping_time = "Ekhono kono ping hoyni"
 next_ping_timestamp = 0
-last_error_message = "Kono error nei (Bot start hocche...)"
+last_status_code = "Waiting..."
+last_error_message = "Kono error nei (Bot active ache)"
 
-def create_initial_placeholder():
-    if not os.path.exists(SCREENSHOT_PATH):
-        try:
-            img = Image.new('RGB', (1280, 800), color='#0f172a')
-            d = ImageDraw.Draw(img)
-            d.text((380, 380), "Shahajjo Bot Starting... Firefox SS Loading...", fill=(255, 255, 255))
-            img.save(SCREENSHOT_PATH)
-        except Exception as e:
-            print(f"Placeholder error: {e}")
-
-create_initial_placeholder()
-
-def bot_scroll_and_keep_alive():
-    global last_ping_time, next_ping_timestamp, last_error_message
+def keep_alive_background_ping():
+    global last_ping_time, next_ping_timestamp, last_status_code, last_error_message
     while True:
-        driver = None
         try:
-            print("🚀 Selenium Firefox start hocche...")
-            firefox_options = Options()
-            firefox_options.add_argument("--headless")
-            firefox_options.binary_location = "/usr/bin/firefox-esr"
-            
-            driver = webdriver.Firefox(options=firefox_options)
-            driver.set_window_size(1280, 800)
-            driver.set_page_load_timeout(90)
-            
-            print(f"🌐 Navigating to {STREAMLIT_URL}...")
-            driver.get(STREAMLIT_URL)
-            
-            print("⏳ Waiting 45 seconds for Streamlit dynamic JS to load...")
-            time.sleep(45)
-            
-            print("📜 Scrolling down (Human behavior simulation)...")
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(4)
-            
-            print("📜 Scrolling up...")
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(3)
-            
-            print("📸 Capturing screenshot...")
-            driver.save_screenshot(SCREENSHOT_PATH)
-            
+            print("🌐 Sending HTTP GET request to Streamlit...")
+            response = requests.get(STREAMLIT_URL, timeout=30)
+            last_status_code = str(response.status_code)
             last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
-            last_error_message = "Kono error nei (Successfully captured with Firefox)"
-            print(f"✅ Success! Screenshot saved at {last_ping_time}")
-
+            last_error_message = f"Success (HTTP Status: {response.status_code})"
+            print(f"✅ Ping successful at {last_ping_time} with status {response.status_code}")
         except Exception as e:
             last_error_message = str(e)
-            print(f"⚠️ Firefox Automation Error: {e}")
-        finally:
-            if driver:
-                driver.quit()
+            last_status_code = "Error"
+            print(f"⚠️ Ping error: {e}")
         
-        next_ping_timestamp = time.time() + 300
-        print("💤 Waiting 5 minutes for next cycle...")
-        time.sleep(300)
+        # Prottee 1 minute (60 seconds) por por ping korbe
+        next_ping_timestamp = time.time() + 60
+        print("💤 Waiting 1 minute for next ping cycle...")
+        time.sleep(60)
 
 @app.route("/")
 def home():
@@ -131,27 +91,27 @@ def home():
                 text-align: left;
                 color: #2b6cb0;
             }
-            .error-card {
-                background: #fff5f5;
-                border-left: 4px solid #e53e3e;
-                padding: 12px;
-                border-radius: 6px;
-                margin-bottom: 15px;
-                font-size: 13px;
-                text-align: left;
-                color: #c53030;
-                word-break: break-all;
-            }
             .timer-card {
                 background: #fefcbf;
                 border-left: 4px solid #d69e2e;
                 padding: 12px;
                 border-radius: 6px;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 font-size: 15px;
                 font-weight: bold;
                 color: #744210;
                 text-align: left;
+            }
+            .error-card {
+                background: #fff5f5;
+                border-left: 4px solid #e53e3e;
+                padding: 12px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                font-size: 13px;
+                text-align: left;
+                color: #c53030;
+                word-break: break-all;
             }
             .screenshot-box {
                 border: 2px dashed #cbd5e1;
@@ -176,25 +136,26 @@ def home():
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Firefox Automated Scroll & Live Preview Bot</div>
+            <div class="subtitle">Pure Python 1-Min Ping & 5-Sec Preview Updater</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
-                🕒 <strong>Last Successful Scroll:</strong> <span id="last-time">{{ last_time }}</span>
+                🕒 <strong>Last Ping Time:</strong> <span id="last-time">{{ last_time }}</span><br>
+                🌐 <strong>Streamlit Status:</strong> <span id="status-code">{{ status_code }}</span>
             </div>
 
             <div class="timer-card">
-                ⏳ <strong>Next Run In:</strong> <span id="countdown">Calculating...</span>
+                ⏳ <strong>Next Ping In:</strong> <span id="countdown">Calculating...</span>
             </div>
 
             <div class="error-card">
-                ⚠️ <strong>Last Status / Error Log:</strong> <span id="error-log">{{ error_msg }}</span>
+                ⚠️ <strong>Status Log:</strong> <span id="error-log">{{ error_msg }}</span>
             </div>
             
             <div class="screenshot-box">
-                <h3>📷 Live Streamlit App Window Preview:</h3>
+                <h3>📷 Live Streamlit App Preview (Refreshes Every 5s):</h3>
                 <div id="image-container">
-                    <img id="live-ss" src="/screenshot?t={{ timestamp }}" alt="Streamlit Live Screenshot">
+                    <img id="live-ss" src="https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800" alt="Streamlit Live Preview">
                 </div>
             </div>
         </div>
@@ -204,7 +165,7 @@ def home():
             
             function updateTimer() {
                 if (targetTime === 0) {
-                    document.getElementById("countdown").innerText = "Prothom run processing-e ache...";
+                    document.getElementById("countdown").innerText = "Prothom ping processing-e ache...";
                     return;
                 }
                 
@@ -212,7 +173,7 @@ def home():
                 var secondsLeft = targetTime - now;
                 
                 if (secondsLeft <= 0) {
-                    document.getElementById("countdown").innerText = "Running now / Scroll cholche...";
+                    document.getElementById("countdown").innerText = "Ping hocche...";
                 } else {
                     var mins = Math.floor(secondsLeft / 60);
                     var secs = secondsLeft % 60;
@@ -223,22 +184,25 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
+            // Prottee 5 second por por background fetch kore preview update korbe
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
                     .then(data => {
                         document.getElementById("last-time").innerText = data.last_time;
+                        document.getElementById("status-code").innerText = data.status_code;
                         document.getElementById("error-log").innerText = data.error_msg;
+                        targetTime = data.next_time;
                         
                         var imgElem = document.getElementById("live-ss");
                         if (imgElem) {
-                            imgElem.src = "/screenshot?t=" + Date.now();
+                            imgElem.src = "https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800&t=" + Date.now();
                         }
                     })
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 10000);
+            setInterval(autoRefreshData, 5000); // 5 seconds interval
         </script>
     </body>
     </html>
@@ -247,7 +211,8 @@ def home():
     return render_template_string(
         html_template, 
         last_time=last_ping_time, 
-        next_time=int(next_ping_timestamp), 
+        next_time=int(next_ping_timestamp),
+        status_code=last_status_code,
         error_msg=last_error_message,
         timestamp=timestamp
     )
@@ -256,19 +221,14 @@ def home():
 def status_json():
     return jsonify({
         "last_time": last_ping_time,
+        "next_time": int(next_ping_timestamp),
+        "status_code": last_status_code,
         "error_msg": last_error_message
     })
 
-@app.route("/screenshot")
-def screenshot():
-    if os.path.exists(SCREENSHOT_PATH):
-        return send_file(SCREENSHOT_PATH, mimetype='image/png')
-    return "Screenshot not ready yet.", 404
-
 if __name__ == "__main__":
-    next_ping_timestamp = time.time() + 300
-    
-    t = threading.Thread(target=bot_scroll_and_keep_alive)
+    next_ping_timestamp = time.time() + 60
+    t = threading.Thread(target=keep_alive_background_ping)
     t.daemon = True
     t.start()
     
