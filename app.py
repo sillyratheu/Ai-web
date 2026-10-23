@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from flask import Flask, send_file, render_template_string, jsonify
 from playwright.sync_api import sync_playwright
+from PIL import Image, ImageDraw
 
 app = Flask(__name__)
 
@@ -13,7 +14,20 @@ SCREENSHOT_PATH = "latest_status.png"
 
 last_ping_time = "Ekhono kono session complete hoyni"
 next_ping_timestamp = 0
-last_error_message = "Kono error nei (Prothom run shuru hocche...)"
+last_error_message = "Kono error nei (Bot start hocche...)"
+
+# Start howar sathei ekta default placeholder image toiri kore rakha hocche jate prothom second thekei SS show kore
+def create_initial_placeholder():
+    if not os.path.exists(SCREENSHOT_PATH):
+        try:
+            img = Image.new('RGB', (1280, 800), color='#0f172a')
+            d = ImageDraw.Draw(img)
+            d.text((380, 380), "Shahajjo Bot Starting... SS Loading...", fill=(255, 255, 255))
+            img.save(SCREENSHOT_PATH)
+        except Exception as e:
+            print(f"Placeholder error: {e}")
+
+create_initial_placeholder()
 
 def bot_scroll_and_keep_alive():
     global last_ping_time, next_ping_timestamp, last_error_message
@@ -21,9 +35,8 @@ def bot_scroll_and_keep_alive():
         try:
             print("🚀 Playwright browser start hocche...")
             with sync_playwright() as p:
-                # System Chromium executable path use kora hocche
+                # Playwright er nijosho chromium use kora hocche without executable_path error
                 browser = p.chromium.launch(
-                    executable_path="/usr/bin/chromium",
                     headless=True,
                     args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
                 )
@@ -32,8 +45,8 @@ def bot_scroll_and_keep_alive():
                 print(f"🌐 Navigating to {STREAMLIT_URL}...")
                 page.goto(STREAMLIT_URL, timeout=90000)
                 
-                print("⏳ Waiting 45 seconds for Streamlit dynamic JS to load...")
-                time.sleep(45)
+                print("⏳ Waiting 30 seconds for Streamlit dynamic JS to load...")
+                time.sleep(30)
                 
                 print("📜 Scrolling down (Human behavior)...")
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
@@ -179,11 +192,7 @@ def home():
             <div class="screenshot-box">
                 <h3>📷 Live Streamlit App Window Preview:</h3>
                 <div id="image-container">
-                    {% if has_image %}
-                        <img id="live-ss" src="/screenshot?t={{ timestamp }}" alt="Streamlit Live Screenshot">
-                    {% else %}
-                        <p id="no-img-msg" style="color: #e74c3c; font-weight: bold; font-size: 14px;">Prothom run cholche... 45 second pore screenshot automatic চলে ashbe!</p>
-                    {% endif %}
+                    <img id="live-ss" src="/screenshot?t={{ timestamp }}" alt="Streamlit Live Screenshot">
                 </div>
             </div>
         </div>
@@ -212,6 +221,7 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
+            // Prottee 10 second por por auto background fetch kore screenshot & status update korbe (No manual refresh needed)
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
@@ -219,42 +229,33 @@ def home():
                         document.getElementById("last-time").innerText = data.last_time;
                         document.getElementById("error-log").innerText = data.error_msg;
                         
-                        if (data.has_image) {
-                            var imgContainer = document.getElementById("image-container");
-                            var imgElem = document.getElementById("live-ss");
-                            if (!imgElem) {
-                                imgContainer.innerHTML = '<img id="live-ss" src="/screenshot?t=' + Date.now() + '" alt="Streamlit Live Screenshot">';
-                            } else {
-                                imgElem.src = "/screenshot?t=" + Date.now();
-                            }
+                        var imgElem = document.getElementById("live-ss");
+                        if (imgElem) {
+                            imgElem.src = "/screenshot?t=" + Date.now();
                         }
                     })
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 10000);
+            setInterval(autoRefreshData, 10000); // Every 10 seconds
         </script>
     </body>
     </html>
     """
-    has_image = os.path.exists(SCREENSHOT_PATH)
     timestamp = time.time()
     return render_template_string(
         html_template, 
         last_time=last_ping_time, 
         next_time=int(next_ping_timestamp), 
         error_msg=last_error_message,
-        has_image=has_image, 
         timestamp=timestamp
     )
 
 @app.route("/status-json")
 def status_json():
-    has_image = os.path.exists(SCREENSHOT_PATH)
     return jsonify({
         "last_time": last_ping_time,
-        "error_msg": last_error_message,
-        "has_image": has_image
+        "error_msg": last_error_message
     })
 
 @app.route("/screenshot")
