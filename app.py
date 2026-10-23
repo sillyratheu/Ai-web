@@ -133,39 +133,30 @@ def home():
                 word-break: break-all;
                 font-weight: 500;
             }
-            .action-box {
+            .screenshot-box {
                 border: 2px dashed #cbd5e1;
                 border-radius: 10px;
-                padding: 20px;
+                padding: 12px;
                 background: #fafafa;
             }
-            .action-box h3 {
+            .screenshot-box h3 {
                 margin-top: 0;
                 color: #4a5568;
                 font-size: 16px;
             }
-            .visit-btn {
-                background-color: #3182ce;
-                color: white;
-                border: none;
-                padding: 12px 25px;
-                font-size: 15px;
-                font-weight: bold;
-                border-radius: 6px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-                transition: background 0.2s;
-            }
-            .visit-btn:hover {
-                background-color: #2b6cb0;
+            img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border: 1px solid #e2e8f0;
             }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Pure Python 1-Minute Ping & Uptime Monitor</div>
+            <div class="subtitle">Pure Python 1-Min Ping & 15-Sec Preview Updater</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
@@ -181,10 +172,11 @@ def home():
                 📌 <strong>Status Log:</strong> <span id="error-log">{{ error_msg }}</span>
             </div>
             
-            <div class="action-box">
-                <h3>🔗 Live Streamlit App Access:</h3>
-                <p style="font-size: 13px; color: #718096; margin-bottom: 15px;">Click below to open your active Streamlit app directly in a new tab:</p>
-                <a href="https://shahajjo.streamlit.app/" target="_blank" class="visit-btn">🌐 Open Shahajjo App</a>
+            <div class="screenshot-box">
+                <h3>📷 Live Streamlit App Preview (Refreshes Every 15s):</h3>
+                <div id="image-container">
+                    <img id="live-ss" src="https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800" alt="Streamlit Live Preview">
+                </div>
             </div>
         </div>
 
@@ -212,6 +204,7 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
+            // Updated to 15 seconds interval for stable preview loading
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
@@ -221,17 +214,15 @@ def home():
                         document.getElementById("error-log").innerText = data.error_msg;
                         targetTime = data.next_time;
                         
-                        var logCard = document.getElementById("log-card");
-                        if (data.is_success) {
-                            logCard.className = "status-card-success";
-                        } else {
-                            logCard.className = "status-card-error";
+                        var imgElem = document.getElementById("live-ss");
+                        if (imgElem) {
+                            imgElem.src = "https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800&t=" + Date.now();
                         }
                     })
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 5000);
+            setInterval(autoRefreshData, 15000); // 15 seconds interval
         </script>
     </body>
     </html>
