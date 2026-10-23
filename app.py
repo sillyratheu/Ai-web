@@ -2,67 +2,57 @@
 import os
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, send_file, render_template_string
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 
-# Target Streamlit App
 STREAMLIT_URL = "https://shahajjo.streamlit.app/"
 SCREENSHOT_PATH = "latest_status.png"
 
-# Global tracking variables
 last_ping_time = "Ekhono kono session complete hoyni"
-next_ping_timestamp = 0  # Epoch timestamp for JavaScript timer
+next_ping_timestamp = 0
 
 def bot_scroll_and_keep_alive():
     global last_ping_time, next_ping_timestamp
     while True:
-        driver = None
         try:
-            print("🌐 Starting Headless Browser for Shahajjo Streamlit...")
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--window-size=1280,800")
-            chrome_options.binary_location = "/usr/bin/chromium"
-            
-            driver = webdriver.Chrome(options=chrome_options)
-            driver.set_page_load_timeout(30)
-            
-            print("🔗 Navigating to Shahajjo Streamlit App...")
-            try:
-                driver.get(STREAMLIT_URL)
-            except Exception as load_err:
-                print(f"⚠️ Page load timeout notice: {load_err}")
-
-            print("⏳ Waiting 30 seconds for dynamic JS to render...")
-            time.sleep(30)
-            
-            print("📜 Scroll Down (Human Behavior)...")
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(4)
-            
-            print("📜 Scroll Up (Human Behavior)...")
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(3)
-            
-            # Save screenshot and update timestamps
-            driver.save_screenshot(SCREENSHOT_PATH)
-            now_dt = datetime.now()
-            last_ping_time = now_dt.strftime("%I:%M:%S %p (%d %b)")
-            print(f"📸 Screenshot saved successfully at {last_ping_time}!")
+            print("🚀 Playwright browser start hocche...")
+            with sync_playwright() as p:
+                # Headless chromium launch kora hocche
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+                )
+                page = browser.new_page(viewport={"width": 1280, "height": 800})
+                
+                print(f"🌐 Navigating to {STREAMLIT_URL}...")
+                page.goto(STREAMLIT_URL, timeout=60000)
+                
+                print("⏳ Waiting 30 seconds for Streamlit dynamic JS to load...")
+                time.sleep(30)
+                
+                print("📜 Scrolling down (Human behavior)...")
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(4)
+                
+                print("📜 Scrolling up...")
+                page.evaluate("window.scrollTo(0, 0);")
+                time.sleep(3)
+                
+                print("📸 Capturing screenshot...")
+                page.screenshot(path=SCREENSHOT_PATH, full_page=False)
+                
+                last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
+                print(f"✅ Success! Screenshot saved at {last_ping_time}")
+                
+                browser.close()
 
         except Exception as e:
-            print(f"⚠️ Automation Error: {e}")
-        finally:
-            if driver:
-                driver.quit()
+            print(f"⚠️ Playwright Automation Error: {e}")
         
-        # Set next execution time (5 minutes = 300 seconds)
+        # Next run timestamp set for timer (5 minutes = 300 seconds)
         next_ping_timestamp = time.time() + 300
         print("💤 Waiting 5 minutes for next cycle...")
         time.sleep(300)
@@ -173,7 +163,7 @@ def home():
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Automated Human-like Scroll & Sleep Prevention Bot</div>
+            <div class="subtitle">Playwright Automated Scroll & Sleep Prevention Bot</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
@@ -241,7 +231,6 @@ def screenshot():
     return "Screenshot not ready yet.", 404
 
 if __name__ == "__main__":
-    # Initialize initial next run timestamp for countdown
     next_ping_timestamp = time.time() + 300
     
     t = threading.Thread(target=bot_scroll_and_keep_alive)
