@@ -4,7 +4,8 @@ import time
 import threading
 from datetime import datetime
 from flask import Flask, send_file, render_template_string, jsonify
-from playwright.sync_api import sync_playwright
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
 from PIL import Image, ImageDraw
 
 app = Flask(__name__)
@@ -16,13 +17,12 @@ last_ping_time = "Ekhono kono session complete hoyni"
 next_ping_timestamp = 0
 last_error_message = "Kono error nei (Bot start hocche...)"
 
-# Start howar sathei ekta default placeholder image toiri kore rakha hocche jate prothom second thekei SS show kore
 def create_initial_placeholder():
     if not os.path.exists(SCREENSHOT_PATH):
         try:
             img = Image.new('RGB', (1280, 800), color='#0f172a')
             d = ImageDraw.Draw(img)
-            d.text((380, 380), "Shahajjo Bot Starting... SS Loading...", fill=(255, 255, 255))
+            d.text((380, 380), "Shahajjo Bot Starting... Firefox SS Loading...", fill=(255, 255, 255))
             img.save(SCREENSHOT_PATH)
         except Exception as e:
             print(f"Placeholder error: {e}")
@@ -32,42 +32,44 @@ create_initial_placeholder()
 def bot_scroll_and_keep_alive():
     global last_ping_time, next_ping_timestamp, last_error_message
     while True:
+        driver = None
         try:
-            print("🚀 Playwright browser start hocche...")
-            with sync_playwright() as p:
-                # Playwright er nijosho chromium use kora hocche without executable_path error
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
-                )
-                page = browser.new_page(viewport={"width": 1280, "height": 800})
-                
-                print(f"🌐 Navigating to {STREAMLIT_URL}...")
-                page.goto(STREAMLIT_URL, timeout=90000)
-                
-                print("⏳ Waiting 30 seconds for Streamlit dynamic JS to load...")
-                time.sleep(30)
-                
-                print("📜 Scrolling down (Human behavior)...")
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(4)
-                
-                print("📜 Scrolling up...")
-                page.evaluate("window.scrollTo(0, 0);")
-                time.sleep(3)
-                
-                print("📸 Capturing screenshot...")
-                page.screenshot(path=SCREENSHOT_PATH, full_page=False)
-                
-                last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
-                last_error_message = "Kono error nei (Successfully captured)"
-                print(f"✅ Success! Screenshot saved at {last_ping_time}")
-                
-                browser.close()
+            print("🚀 Selenium Firefox start hocche...")
+            firefox_options = Options()
+            firefox_options.add_argument("--headless")
+            firefox_options.binary_location = "/usr/bin/firefox-esr"
+            
+            driver = webdriver.Firefox(options=firefox_options)
+            driver.set_window_size(1280, 800)
+            driver.set_page_load_timeout(90)
+            
+            print(f"🌐 Navigating to {STREAMLIT_URL}...")
+            driver.get(STREAMLIT_URL)
+            
+            print("⏳ Waiting 45 seconds for Streamlit dynamic JS to load...")
+            time.sleep(45)
+            
+            print("📜 Scrolling down (Human behavior simulation)...")
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(4)
+            
+            print("📜 Scrolling up...")
+            driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(3)
+            
+            print("📸 Capturing screenshot...")
+            driver.save_screenshot(SCREENSHOT_PATH)
+            
+            last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
+            last_error_message = "Kono error nei (Successfully captured with Firefox)"
+            print(f"✅ Success! Screenshot saved at {last_ping_time}")
 
         except Exception as e:
             last_error_message = str(e)
-            print(f"⚠️ Playwright Automation Error: {e}")
+            print(f"⚠️ Firefox Automation Error: {e}")
+        finally:
+            if driver:
+                driver.quit()
         
         next_ping_timestamp = time.time() + 300
         print("💤 Waiting 5 minutes for next cycle...")
@@ -174,7 +176,7 @@ def home():
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Playwright Automated Scroll & Live Preview Bot</div>
+            <div class="subtitle">Firefox Automated Scroll & Live Preview Bot</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
@@ -221,7 +223,6 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
-            // Prottee 10 second por por auto background fetch kore screenshot & status update korbe (No manual refresh needed)
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
@@ -237,7 +238,7 @@ def home():
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 10000); // Every 10 seconds
+            setInterval(autoRefreshData, 10000);
         </script>
     </body>
     </html>
