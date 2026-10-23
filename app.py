@@ -3,7 +3,7 @@ import os
 import time
 import threading
 from datetime import datetime
-from flask import Flask, send_file, render_template_string
+from flask import Flask, send_file, render_template_string, jsonify
 from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
@@ -13,14 +13,14 @@ SCREENSHOT_PATH = "latest_status.png"
 
 last_ping_time = "Ekhono kono session complete hoyni"
 next_ping_timestamp = 0
+last_error_message = "Kono error nei (Prothom run shuru hocche...)"
 
 def bot_scroll_and_keep_alive():
-    global last_ping_time, next_ping_timestamp
+    global last_ping_time, next_ping_timestamp, last_error_message
     while True:
         try:
             print("🚀 Playwright browser start hocche...")
             with sync_playwright() as p:
-                # Headless chromium launch kora hocche
                 browser = p.chromium.launch(
                     headless=True,
                     args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
@@ -28,10 +28,10 @@ def bot_scroll_and_keep_alive():
                 page = browser.new_page(viewport={"width": 1280, "height": 800})
                 
                 print(f"🌐 Navigating to {STREAMLIT_URL}...")
-                page.goto(STREAMLIT_URL, timeout=60000)
+                page.goto(STREAMLIT_URL, timeout=90000) # Increased timeout to 90s
                 
-                print("⏳ Waiting 30 seconds for Streamlit dynamic JS to load...")
-                time.sleep(30)
+                print("⏳ Waiting 45 seconds for Streamlit dynamic JS to load...")
+                time.sleep(45) # Increased wait time
                 
                 print("📜 Scrolling down (Human behavior)...")
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
@@ -45,14 +45,15 @@ def bot_scroll_and_keep_alive():
                 page.screenshot(path=SCREENSHOT_PATH, full_page=False)
                 
                 last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
+                last_error_message = "Kono error nei (Successfully captured)"
                 print(f"✅ Success! Screenshot saved at {last_ping_time}")
                 
                 browser.close()
 
         except Exception as e:
+            last_error_message = str(e)
             print(f"⚠️ Playwright Automation Error: {e}")
         
-        # Next run timestamp set for timer (5 minutes = 300 seconds)
         next_ping_timestamp = time.time() + 300
         print("💤 Waiting 5 minutes for next cycle...")
         time.sleep(300)
@@ -113,6 +114,17 @@ def home():
                 text-align: left;
                 color: #2b6cb0;
             }
+            .error-card {
+                background: #fff5f5;
+                border-left: 4px solid #e53e3e;
+                padding: 12px;
+                border-radius: 6px;
+                margin-bottom: 15px;
+                font-size: 13px;
+                text-align: left;
+                color: #c53030;
+                word-break: break-all;
+            }
             .timer-card {
                 background: #fefcbf;
                 border-left: 4px solid #d69e2e;
@@ -142,49 +154,36 @@ def home():
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                 border: 1px solid #e2e8f0;
             }
-            .refresh-btn {
-                margin-top: 20px;
-                background-color: #3182ce;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 6px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-            }
-            .refresh-btn:hover {
-                background-color: #2b6cb0;
-            }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Playwright Automated Scroll & Sleep Prevention Bot</div>
+            <div class="subtitle">Playwright Automated Scroll & Live Preview Bot</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
-                🕒 <strong>Last Successful Scroll:</strong> {{ last_time }}
+                🕒 <strong>Last Successful Scroll:</strong> <span id="last-time">{{ last_time }}</span>
             </div>
 
             <div class="timer-card">
                 ⏳ <strong>Next Run In:</strong> <span id="countdown">Calculating...</span>
             </div>
+
+            <div class="error-card">
+                ⚠️ <strong>Last Status / Error Log:</strong> <span id="error-log">{{ error_msg }}</span>
+            </div>
             
             <div class="screenshot-box">
                 <h3>📷 Live Streamlit App Window Preview:</h3>
-                {% if has_image %}
-                    <img src="/screenshot?t={{ timestamp }}" alt="Streamlit Live Screenshot">
-                {% else %}
-                    <p style="color: #e74c3c; font-weight: bold; font-size: 14px;">Prothom run cholche... 30-40 second pore page refresh korlei screenshot chole ashbe!</p>
-                {% endif %}
+                <div id="image-container">
+                    {% if has_image %}
+                        <img id="live-ss" src="/screenshot?t={{ timestamp }}" alt="Streamlit Live Screenshot">
+                    {% else %}
+                        <p id="no-img-msg" style="color: #e74c3c; font-weight: bold; font-size: 14px;">Prothom run cholche... 45 second pore screenshot automatic চলে ashbe!</p>
+                    {% endif %}
+                </div>
             </div>
-            
-            <br>
-            <a href="/" class="refresh-btn">🔄 Refresh Dashboard</a>
         </div>
 
         <script>
@@ -210,6 +209,29 @@ def home():
             
             setInterval(updateTimer, 1000);
             updateTimer();
+
+            // Auto refresh screenshot and status every 10 seconds without reloading page
+            function autoRefreshData() {
+                fetch('/status-json')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("last-time").innerText = data.last_time;
+                        document.getElementById("error-log").innerText = data.error_msg;
+                        
+                        if (data.has_image) {
+                            var imgContainer = document.getElementById("image-container");
+                            var imgElem = document.getElementById("live-ss");
+                            if (!imgElem) {
+                                imgContainer.innerHTML = '<img id="live-ss" src="/screenshot?t=' + Date.now() + '" alt="Streamlit Live Screenshot">';
+                            } else {
+                                imgElem.src = "/screenshot?t=" + Date.now();
+                            }
+                        }
+                    })
+                    .catch(err => console.log('Fetch error:', err));
+            }
+
+            setInterval(autoRefreshData, 10000); // 10 seconds interval
         </script>
     </body>
     </html>
@@ -220,9 +242,19 @@ def home():
         html_template, 
         last_time=last_ping_time, 
         next_time=int(next_ping_timestamp), 
+        error_msg=last_error_message,
         has_image=has_image, 
         timestamp=timestamp
     )
+
+@app.route("/status-json")
+def status_json():
+    has_image = os.path.exists(SCREENSHOT_PATH)
+    return jsonify({
+        "last_time": last_ping_time,
+        "error_msg": last_error_message,
+        "has_image": has_image
+    })
 
 @app.route("/screenshot")
 def screenshot():
