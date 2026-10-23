@@ -10,27 +10,34 @@ app = Flask(__name__)
 
 STREAMLIT_URL = "https://shahajjo.streamlit.app/"
 
-last_ping_time = "Ekhono kono ping hoyni"
+last_ping_time = "Waiting for first ping..."
 next_ping_timestamp = 0
 last_status_code = "Waiting..."
-last_error_message = "Kono error nei (Bot active ache)"
+last_error_message = "Initializing bot..."
+is_success = True
 
 def keep_alive_background_ping():
-    global last_ping_time, next_ping_timestamp, last_status_code, last_error_message
+    global last_ping_time, next_ping_timestamp, last_status_code, last_error_message, is_success
     while True:
         try:
             print("🌐 Sending HTTP GET request to Streamlit...")
             response = requests.get(STREAMLIT_URL, timeout=30)
             last_status_code = str(response.status_code)
             last_ping_time = datetime.now().strftime("%I:%M:%S %p (%d %b)")
-            last_error_message = f"Success (HTTP Status: {response.status_code})"
+            if response.status_code == 200:
+                last_error_message = f"Success: HTTP Status {response.status_code} OK"
+                is_success = True
+            else:
+                last_error_message = f"Warning: HTTP Status {response.status_code}"
+                is_success = False
             print(f"✅ Ping successful at {last_ping_time} with status {response.status_code}")
         except Exception as e:
-            last_error_message = str(e)
-            last_status_code = "Error"
+            last_error_message = f"Error: {str(e)}"
+            last_status_code = "Failed"
+            is_success = False
             print(f"⚠️ Ping error: {e}")
         
-        # Prottee 1 minute (60 seconds) por por ping korbe
+        # Next ping in 1 minute (60 seconds)
         next_ping_timestamp = time.time() + 60
         print("💤 Waiting 1 minute for next ping cycle...")
         time.sleep(60)
@@ -102,7 +109,19 @@ def home():
                 color: #744210;
                 text-align: left;
             }
-            .error-card {
+            .status-card-success {
+                background: #f0fff4;
+                border-left: 4px solid #38a169;
+                padding: 12px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                font-size: 13px;
+                text-align: left;
+                color: #276749;
+                word-break: break-all;
+                font-weight: 500;
+            }
+            .status-card-error {
                 background: #fff5f5;
                 border-left: 4px solid #e53e3e;
                 padding: 12px;
@@ -112,31 +131,41 @@ def home():
                 text-align: left;
                 color: #c53030;
                 word-break: break-all;
+                font-weight: 500;
             }
-            .screenshot-box {
+            .action-box {
                 border: 2px dashed #cbd5e1;
                 border-radius: 10px;
-                padding: 12px;
+                padding: 20px;
                 background: #fafafa;
             }
-            .screenshot-box h3 {
+            .action-box h3 {
                 margin-top: 0;
                 color: #4a5568;
                 font-size: 16px;
             }
-            img {
-                max-width: 100%;
-                height: auto;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                border: 1px solid #e2e8f0;
+            .visit-btn {
+                background-color: #3182ce;
+                color: white;
+                border: none;
+                padding: 12px 25px;
+                font-size: 15px;
+                font-weight: bold;
+                border-radius: 6px;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: background 0.2s;
+            }
+            .visit-btn:hover {
+                background-color: #2b6cb0;
             }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🚀 Shahajjo AI Keeper Dashboard</h1>
-            <div class="subtitle">Pure Python 1-Min Ping & 5-Sec Preview Updater</div>
+            <div class="subtitle">Pure Python 1-Minute Ping & Uptime Monitor</div>
             <div class="status-badge">🟢 Bot Active & Running 24/7</div>
             
             <div class="info-card">
@@ -148,15 +177,14 @@ def home():
                 ⏳ <strong>Next Ping In:</strong> <span id="countdown">Calculating...</span>
             </div>
 
-            <div class="error-card">
-                ⚠️ <strong>Status Log:</strong> <span id="error-log">{{ error_msg }}</span>
+            <div id="log-card" class="{% if is_success %}status-card-success{% else %}status-card-error{% endif %}">
+                📌 <strong>Status Log:</strong> <span id="error-log">{{ error_msg }}</span>
             </div>
             
-            <div class="screenshot-box">
-                <h3>📷 Live Streamlit App Preview (Refreshes Every 5s):</h3>
-                <div id="image-container">
-                    <img id="live-ss" src="https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800" alt="Streamlit Live Preview">
-                </div>
+            <div class="action-box">
+                <h3>🔗 Live Streamlit App Access:</h3>
+                <p style="font-size: 13px; color: #718096; margin-bottom: 15px;">Click below to open your active Streamlit app directly in a new tab:</p>
+                <a href="https://shahajjo.streamlit.app/" target="_blank" class="visit-btn">🌐 Open Shahajjo App</a>
             </div>
         </div>
 
@@ -165,7 +193,7 @@ def home():
             
             function updateTimer() {
                 if (targetTime === 0) {
-                    document.getElementById("countdown").innerText = "Prothom ping processing-e ache...";
+                    document.getElementById("countdown").innerText = "Initializing first ping...";
                     return;
                 }
                 
@@ -173,7 +201,7 @@ def home():
                 var secondsLeft = targetTime - now;
                 
                 if (secondsLeft <= 0) {
-                    document.getElementById("countdown").innerText = "Ping hocche...";
+                    document.getElementById("countdown").innerText = "Pinging now...";
                 } else {
                     var mins = Math.floor(secondsLeft / 60);
                     var secs = secondsLeft % 60;
@@ -184,7 +212,6 @@ def home():
             setInterval(updateTimer, 1000);
             updateTimer();
 
-            // Prottee 5 second por por background fetch kore preview update korbe
             function autoRefreshData() {
                 fetch('/status-json')
                     .then(response => response.json())
@@ -194,15 +221,17 @@ def home():
                         document.getElementById("error-log").innerText = data.error_msg;
                         targetTime = data.next_time;
                         
-                        var imgElem = document.getElementById("live-ss");
-                        if (imgElem) {
-                            imgElem.src = "https://s0.wordpress.com/mshots/v1/https://shahajjo.streamlit.app/?w=1280&h=800&t=" + Date.now();
+                        var logCard = document.getElementById("log-card");
+                        if (data.is_success) {
+                            logCard.className = "status-card-success";
+                        } else {
+                            logCard.className = "status-card-error";
                         }
                     })
                     .catch(err => console.log('Fetch error:', err));
             }
 
-            setInterval(autoRefreshData, 5000); // 5 seconds interval
+            setInterval(autoRefreshData, 5000);
         </script>
     </body>
     </html>
@@ -214,6 +243,7 @@ def home():
         next_time=int(next_ping_timestamp),
         status_code=last_status_code,
         error_msg=last_error_message,
+        is_success=is_success,
         timestamp=timestamp
     )
 
@@ -223,7 +253,8 @@ def status_json():
         "last_time": last_ping_time,
         "next_time": int(next_ping_timestamp),
         "status_code": last_status_code,
-        "error_msg": last_error_message
+        "error_msg": last_error_message,
+        "is_success": is_success
     })
 
 if __name__ == "__main__":
